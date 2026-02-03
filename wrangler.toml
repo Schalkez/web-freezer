@@ -1,0 +1,8 @@
+name = "web-freezer"
+compatibility_date = "2024-01-01"
+
+# R2 bucket for storing archives
+[[r2_buckets]]
+binding = "ARCHIVES"
+bucket_name = "web-freezer-archives"
+preview_bucket_name = "web-freezer-archives-preview"

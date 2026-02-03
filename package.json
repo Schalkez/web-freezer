@@ -1,0 +1,41 @@
+{
+  "name": "web-freezer",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "npm@10.9.2",
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test": "vitest",
+    "test:integration": "vitest --config vitest.integration.config.ts",
+    "pages:build": "npx @cloudflare/next-on-pages",
+    "pages:deploy": "npm run pages:build && wrangler pages deploy",
+    "pages:watch": "npx @cloudflare/next-on-pages --watch",
+    "pages:dev": "npx wrangler pages dev .vercel/output/static --compatibility-flag=nodejs_compat"
+  },
+  "dependencies": {
+    "next": "^15.1.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "cheerio": "^1.0.0",
+    "jszip": "^3.10.1",
+    "xml2js": "^0.6.2",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@cloudflare/next-on-pages": "^1.13.5",
+    "@cloudflare/workers-types": "^4.20250110.0",
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "^15.1.4",
+    "postcss": "^8",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5",
+    "vitest": "^2.1.8",
+    "wrangler": "^3.100.0"
+  }
+}
