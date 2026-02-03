@@ -29,106 +29,142 @@ export interface CrawlProgress {
 
 export type ProgressCallback = (progress: CrawlProgress) => void
 
-/**
- * Orchestrate full website crawl
- */
+interface PageData {
+  url: string
+  html: string
+  originalHtml: string
+}
+
+const DEFAULT_MAX_PAGES = 100
+const DEFAULT_MAX_DEPTH = 3
+const PROGRESS_WEIGHTS = {
+  DISCOVERY: 10,
+  PAGES: 30,
+  ASSETS: 40,
+  PACKAGING: 20,
+} as const
+
 export async function crawlWebsite(
   config: CrawlConfig,
   onProgress?: ProgressCallback
 ): Promise<Blob> {
   const domain = extractDomain(config.url)
   
-  // Stage 1: Discover URLs
-  onProgress?.({
-    stage: 'discovering',
-    pagesDiscovered: 0,
-    pagesDownloaded: 0,
-    assetsDownloaded: 0,
-    totalAssets: 0,
-    percentage: 0,
-  })
+  const urls = await discoverUrls(config, onProgress)
+  const pages = await downloadPages(urls, onProgress)
+  const assets = await downloadAllAssets(pages, onProgress)
+  const rewrittenContent = rewriteUrls(pages, assets, domain)
+  
+  return packageContent(rewrittenContent, domain, config.method, onProgress)
+}
+
+async function discoverUrls(
+  config: CrawlConfig,
+  onProgress?: ProgressCallback
+): Promise<string[]> {
+  reportProgress(onProgress, 'discovering', 0, 0, 0, 0, 0)
 
   let urls: string[] = []
-  let crawlMethod: 'sitemap' | 'link_discovery' = config.method
-
+  
   if (config.method === 'sitemap') {
     const result = await parseSitemap(config.url)
     if (result.urls.length > 0) {
-      urls = result.urls.slice(0, config.maxPages || 100)
-    } else {
-      // Fallback to link discovery
-      crawlMethod = 'link_discovery'
+      urls = result.urls.slice(0, config.maxPages || DEFAULT_MAX_PAGES)
     }
   }
 
-  if (config.method === 'link_discovery' || urls.length === 0) {
+  if (urls.length === 0) {
     const crawlOptions: CrawlOptions = {
-      maxDepth: config.maxDepth || 3,
-      maxPages: config.maxPages || 100,
+      maxDepth: config.maxDepth || DEFAULT_MAX_DEPTH,
+      maxPages: config.maxPages || DEFAULT_MAX_PAGES,
       sameDomainOnly: true,
     }
     const result = await crawlLinks(config.url, crawlOptions)
     urls = result.urls
   }
 
-  onProgress?.({
-    stage: 'discovering',
-    pagesDiscovered: urls.length,
-    pagesDownloaded: 0,
-    assetsDownloaded: 0,
-    totalAssets: 0,
-    percentage: 10,
-  })
+  reportProgress(onProgress, 'discovering', urls.length, 0, 0, 0, PROGRESS_WEIGHTS.DISCOVERY)
+  return urls
+}
 
-  // Stage 2: Download pages
-  const pages: Array<{ url: string; html: string; originalHtml: string }> = []
+async function downloadPages(
+  urls: string[],
+  onProgress?: ProgressCallback
+): Promise<PageData[]> {
+  const pages: PageData[] = []
   const allAssetUrls = new Set<string>()
 
   for (let i = 0; i < urls.length; i++) {
-    const url = urls[i]
     try {
-      const pageResult = await downloadPage(url)
+      const pageResult = await downloadPage(urls[i])
       pages.push({
-        url,
+        url: urls[i],
         html: pageResult.html,
         originalHtml: pageResult.html,
       })
 
-      // Collect all asset URLs
-      Object.values(pageResult.assets).flat().forEach((assetUrl) => {
-        allAssetUrls.add(assetUrl)
-      })
+      Object.values(pageResult.assets)
+        .flat()
+        .forEach((url) => allAssetUrls.add(url))
 
-      onProgress?.({
-        stage: 'downloading_pages',
-        pagesDiscovered: urls.length,
-        pagesDownloaded: i + 1,
-        assetsDownloaded: 0,
-        totalAssets: allAssetUrls.size,
-        percentage: 10 + (i / urls.length) * 30,
-      })
-    } catch (error) {
-      // Skip failed pages
+      const percentage = PROGRESS_WEIGHTS.DISCOVERY + 
+        (i / urls.length) * PROGRESS_WEIGHTS.PAGES
+      
+      reportProgress(
+        onProgress,
+        'downloading_pages',
+        urls.length,
+        i + 1,
+        0,
+        allAssetUrls.size,
+        percentage
+      )
+    } catch {
       continue
     }
   }
 
-  // Stage 3: Download assets
+  return pages
+}
+
+async function downloadAllAssets(
+  pages: PageData[],
+  onProgress?: ProgressCallback
+) {
+  const allAssetUrls = new Set<string>()
+  
+  for (const page of pages) {
+    const pageResult = await downloadPage(page.url)
+    Object.values(pageResult.assets)
+      .flat()
+      .forEach((url) => allAssetUrls.add(url))
+  }
+
   const assetUrls = Array.from(allAssetUrls)
   const downloadedAssets = await downloadAssets(assetUrls, (progress) => {
-    onProgress?.({
-      stage: 'downloading_assets',
-      pagesDiscovered: urls.length,
-      pagesDownloaded: pages.length,
-      assetsDownloaded: progress.downloaded,
-      totalAssets: progress.total,
-      percentage: 40 + (progress.downloaded / progress.total) * 40,
-    })
+    const percentage = PROGRESS_WEIGHTS.DISCOVERY + 
+      PROGRESS_WEIGHTS.PAGES + 
+      (progress.downloaded / progress.total) * PROGRESS_WEIGHTS.ASSETS
+    
+    reportProgress(
+      onProgress,
+      'downloading_assets',
+      pages.length,
+      pages.length,
+      progress.downloaded,
+      progress.total,
+      percentage
+    )
   })
 
-  // Extract fonts from CSS
+  const fonts = await extractAndDownloadFonts(downloadedAssets)
+  return [...downloadedAssets, ...fonts]
+}
+
+async function extractAndDownloadFonts(assets: any[]) {
   const fontUrls = new Set<string>()
-  for (const asset of downloadedAssets) {
+  
+  for (const asset of assets) {
     if (asset.type === 'css') {
       const cssContent = new TextDecoder().decode(asset.content)
       const fonts = await extractFontsFromCSS(cssContent, asset.url)
@@ -136,28 +172,23 @@ export async function crawlWebsite(
     }
   }
 
-  // Download fonts
-  if (fontUrls.size > 0) {
-    const fonts = await downloadAssets(Array.from(fontUrls))
-    downloadedAssets.push(...fonts)
-  }
+  if (fontUrls.size === 0) return []
+  return downloadAssets(Array.from(fontUrls))
+}
 
-  // Stage 4: Rewrite URLs
-  const urlMapping = buildURLMapping(downloadedAssets)
+function rewriteUrls(pages: PageData[], assets: any[], domain: string) {
+  const urlMapping = buildURLMapping(assets)
 
-  // Add page URL mappings
   for (const page of pages) {
     const localPath = urlToLocalPath(page.url, domain)
     urlMapping.set(page.url, localPath)
   }
 
-  // Rewrite HTML
   for (const page of pages) {
     page.html = rewriteHTMLUrls(page.originalHtml, urlMapping)
   }
 
-  // Rewrite CSS
-  for (const asset of downloadedAssets) {
+  for (const asset of assets) {
     if (asset.type === 'css') {
       const cssContent = new TextDecoder().decode(asset.content)
       const rewritten = rewriteCSSUrls(cssContent, urlMapping)
@@ -165,48 +196,80 @@ export async function crawlWebsite(
     }
   }
 
-  // Stage 5: Package
-  onProgress?.({
-    stage: 'packaging',
-    pagesDiscovered: urls.length,
-    pagesDownloaded: pages.length,
-    assetsDownloaded: downloadedAssets.length,
-    totalAssets: downloadedAssets.length,
-    percentage: 90,
-  })
+  return { pages, assets }
+}
 
-  const totalSizeMb = calculateTotalSize(pages, downloadedAssets)
+async function packageContent(
+  content: { pages: PageData[]; assets: any[] },
+  domain: string,
+  method: 'sitemap' | 'link_discovery',
+  onProgress?: ProgressCallback
+): Promise<Blob> {
+  const { pages, assets } = content
+  
+  const percentage = PROGRESS_WEIGHTS.DISCOVERY + 
+    PROGRESS_WEIGHTS.PAGES + 
+    PROGRESS_WEIGHTS.ASSETS
+  
+  reportProgress(
+    onProgress,
+    'packaging',
+    pages.length,
+    pages.length,
+    assets.length,
+    assets.length,
+    percentage
+  )
+
+  const totalSizeMb = calculateTotalSize(pages, assets)
   const manifest = generateManifest(
     domain,
     pages.length,
-    downloadedAssets.length,
+    assets.length,
     totalSizeMb,
-    crawlMethod
+    method
   )
 
   const packageContent: PackageContent = {
     pages,
-    assets: downloadedAssets,
+    assets,
     manifest,
   }
 
   const zipBlob = await buildPackage(packageContent)
 
-  onProgress?.({
-    stage: 'packaging',
-    pagesDiscovered: urls.length,
-    pagesDownloaded: pages.length,
-    assetsDownloaded: downloadedAssets.length,
-    totalAssets: downloadedAssets.length,
-    percentage: 100,
-  })
+  reportProgress(
+    onProgress,
+    'packaging',
+    pages.length,
+    pages.length,
+    assets.length,
+    assets.length,
+    100
+  )
 
   return zipBlob
 }
 
-/**
- * Convert URL to local file path
- */
+function reportProgress(
+  callback: ProgressCallback | undefined,
+  stage: CrawlProgress['stage'],
+  pagesDiscovered: number,
+  pagesDownloaded: number,
+  assetsDownloaded: number,
+  totalAssets: number,
+  percentage: number
+) {
+  callback?.({
+    stage,
+    pagesDiscovered,
+    pagesDownloaded,
+    assetsDownloaded,
+    totalAssets,
+    percentage,
+  })
+}
+
 function urlToLocalPath(url: string, domain: string): string {
   const parsed = new URL(url)
   let path = parsed.pathname

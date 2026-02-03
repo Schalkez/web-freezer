@@ -1,9 +1,11 @@
 import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
+  // OpenNext Cloudflare adapter configuration
   experimental: {
-    // Enable Cloudflare Pages compatibility
-    runtime: 'edge',
+    serverActions: {
+      bodySizeLimit: '2mb',
+    },
   },
 }
 

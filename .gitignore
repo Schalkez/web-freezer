@@ -12,6 +12,7 @@ out
 build
 dist
 .vercel
+.open-next
 
 # Production
 *.log
