@@ -1,6 +1,6 @@
 name = "web-freezer"
 compatibility_date = "2024-01-01"
-pages_build_output_dir = ".open-next/worker"
+pages_build_output_dir = ".open-next"
 
 # R2 bucket for storing archives
 [[r2_buckets]]

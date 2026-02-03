@@ -26,9 +26,9 @@
    - Click **Connect to Git**
    - Select your repository: `web-freezer`
    - Configure build settings:
-     - **Framework preset**: Next.js
-     - **Build command**: `pnpm run pages:build`
-     - **Build output directory**: `.open-next/worker`
+     - **Framework preset**: None
+     - **Build command**: `npx @opennextjs/cloudflare build`
+     - **Build output directory**: `.open-next`
      - **Node version**: 22
 
 3. **Deploy**:
@@ -46,7 +46,7 @@ wrangler login
 pnpm run pages:build
 
 # Deploy
-wrangler pages deploy .open-next/worker --project-name=web-freezer
+wrangler pages deploy .open-next --project-name=web-freezer
 ```
 
 ## Environment Variables (Optional)
