@@ -11,7 +11,9 @@
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"deploy": "pnpm run build && wrangler deploy",
-		"cf-typegen": "wrangler types ./src/worker-configuration.d.ts"
+		"cf-typegen": "wrangler types ./src/worker-configuration.d.ts",
+		"test": "vitest run",
+		"test:watch": "vitest"
 	},
 	"devDependencies": {
 		"@cloudflare/workers-types": "^4.20250127.0",
@@ -24,6 +26,7 @@
 		"svelte-check": "^4.3.5",
 		"typescript": "^5.9.3",
 		"vite": "^7.3.1",
+		"vitest": "^4.0.18",
 		"wrangler": "^4.63.0"
 	}
 }
