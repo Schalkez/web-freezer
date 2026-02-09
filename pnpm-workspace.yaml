@@ -1,0 +1,5 @@
+packages:
+  - 'crawl-worker'
+
+onlyBuiltDependencies:
+  - esbuild

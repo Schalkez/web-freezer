@@ -1,41 +1,29 @@
 {
-  "name": "web-freezer",
-  "version": "0.1.0",
-  "private": true,
-  "packageManager": "pnpm@10.11.1",
-  "scripts": {
-    "dev": "next dev --turbopack",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "test": "vitest",
-    "test:integration": "vitest --config vitest.integration.config.ts",
-    "pages:build": "npx @opennextjs/cloudflare build",
-    "pages:deploy": "pnpm run pages:build && wrangler pages deploy",
-    "pages:dev": "wrangler pages dev .open-next --compatibility-flag=nodejs_compat"
-  },
-  "dependencies": {
-    "cheerio": "^1.2.0",
-    "jszip": "^3.10.1",
-    "next": "^16.1.6",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4",
-    "xml2js": "^0.6.2",
-    "zod": "^4.3.6"
-  },
-  "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260203.0",
-    "@opennextjs/cloudflare": "^1.16.2",
-    "@types/node": "^25.2.0",
-    "@types/react": "^19.2.10",
-    "@types/react-dom": "^19.2.3",
-    "@types/xml2js": "^0.4.14",
-    "eslint": "^9.39.2",
-    "eslint-config-next": "^16.1.6",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^4.1.18",
-    "typescript": "^5.9.3",
-    "vitest": "^4.0.18",
-    "wrangler": "^4.62.0"
-  }
+	"name": "web-freezer-svelte",
+	"private": true,
+	"version": "0.0.1",
+	"type": "module",
+	"scripts": {
+		"dev": "vite dev",
+		"build": "vite build",
+		"preview": "pnpm run build && wrangler dev",
+		"prepare": "svelte-kit sync || echo ''",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"deploy": "pnpm run build && wrangler deploy",
+		"cf-typegen": "wrangler types ./src/worker-configuration.d.ts"
+	},
+	"devDependencies": {
+		"@cloudflare/workers-types": "^4.20250127.0",
+		"@sveltejs/adapter-auto": "^7.0.0",
+		"@sveltejs/adapter-cloudflare": "^7.2.6",
+		"@sveltejs/kit": "^2.50.1",
+		"@sveltejs/vite-plugin-svelte": "^6.2.4",
+		"@types/node": "^25.2.2",
+		"svelte": "^5.48.2",
+		"svelte-check": "^4.3.5",
+		"typescript": "^5.9.3",
+		"vite": "^7.3.1",
+		"wrangler": "^4.63.0"
+	}
 }

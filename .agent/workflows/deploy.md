@@ -1,176 +1,84 @@
 ---
-description: Deployment command for production releases. Pre-flight checks and deployment execution.
+description: Deploy Web Freezer to Cloudflare. Builds and deploys both the SvelteKit frontend (Workers) and the Crawl Worker.
 ---
 
-# /deploy - Production Deployment
+# /deploy - Web Freezer Production Deployment
 
-$ARGUMENTS
+// turbo-all
+
+## Architecture
+
+| Service | Platform | URL |
+|---------|----------|-----|
+| **Frontend + API** | Cloudflare Workers | `https://web-freezer.mynameishieenf.workers.dev` |
+| **Crawl Worker** | Cloudflare Workers | `https://web-freezer-crawl-worker.mynameishieenf.workers.dev` |
+
+### Bindings (configured in `wrangler.jsonc`)
+
+| Binding | Type | Resource |
+|---------|------|----------|
+| `KV` | KV Namespace | `4ff9491c90734dac93663322cc6fc6f3` |
+| `R2` | R2 Bucket | `web-freezer-archives` |
+| `CRAWL_QUEUE` | Queue | `web-freezer-crawl-jobs` |
+| `ASSETS` | Static Assets | `.svelte-kit/cloudflare` |
+| `TURNSTILE_SITE_KEY` | Env Variable | `0x4AAAAAACZh6penZBTNI3h1` |
 
 ---
 
-## Purpose
+## Steps
 
-This command handles production deployment with pre-flight checks, deployment execution, and verification.
+### 1. Build the SvelteKit app
 
----
-
-## Sub-commands
-
-```
-/deploy            - Interactive deployment wizard
-/deploy check      - Run pre-deployment checks only
-/deploy preview    - Deploy to preview/staging
-/deploy production - Deploy to production
-/deploy rollback   - Rollback to previous version
-```
-
----
-
-## Pre-Deployment Checklist
-
-Before any deployment:
-
-```markdown
-## 🚀 Pre-Deploy Checklist
-
-### Code Quality
-- [ ] No TypeScript errors (`npx tsc --noEmit`)
-- [ ] ESLint passing (`npx eslint .`)
-- [ ] All tests passing (`npm test`)
-
-### Security
-- [ ] No hardcoded secrets
-- [ ] Environment variables documented
-- [ ] Dependencies audited (`npm audit`)
-
-### Performance
-- [ ] Bundle size acceptable
-- [ ] No console.log statements
-- [ ] Images optimized
-
-### Documentation
-- [ ] README updated
-- [ ] CHANGELOG updated
-- [ ] API docs current
-
-### Ready to deploy? (y/n)
+```bash
+pnpm run build
 ```
 
+### 2. Deploy the frontend + API to Cloudflare Workers
+
+> **IMPORTANT**: Use `npx wrangler deploy` (Workers), NOT `npx wrangler pages deploy` (Pages).
+> The config file `wrangler.jsonc` contains all bindings (KV, R2, Queue).
+
+```bash
+npx wrangler deploy
+```
+
+### 3. Deploy the Crawl Worker
+
+```bash
+cd crawl-worker && npx wrangler deploy
+```
+
+### 4. Verify deployment
+
+Open `https://web-freezer.mynameishieenf.workers.dev` in browser and check:
+- [ ] Page loads with WEB_FREEZER header
+- [ ] Turnstile captcha renders
+- [ ] Boot sequence logs appear in terminal
+
 ---
 
-## Deployment Flow
+## Secrets
 
-```
-┌─────────────────┐
-│  /deploy        │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  Pre-flight     │
-│  checks         │
-└────────┬────────┘
-         │
-    Pass? ──No──► Fix issues
-         │
-        Yes
-         │
-         ▼
-┌─────────────────┐
-│  Build          │
-│  application    │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  Deploy to      │
-│  platform       │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  Health check   │
-│  & verify       │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  ✅ Complete    │
-└─────────────────┘
+If deploying for the first time, set the Turnstile secret:
+
+```bash
+npx wrangler secret put TURNSTILE_SECRET_KEY
 ```
 
 ---
 
-## Output Format
+## Rollback
 
-### Successful Deploy
-
-```markdown
-## 🚀 Deployment Complete
-
-### Summary
-- **Version:** v1.2.3
-- **Environment:** production
-- **Duration:** 47 seconds
-- **Platform:** Vercel
-
-### URLs
-- 🌐 Production: https://app.example.com
-- 📊 Dashboard: https://vercel.com/project
-
-### What Changed
-- Added user profile feature
-- Fixed login bug
-- Updated dependencies
-
-### Health Check
-✅ API responding (200 OK)
-✅ Database connected
-✅ All services healthy
-```
-
-### Failed Deploy
-
-```markdown
-## ❌ Deployment Failed
-
-### Error
-Build failed at step: TypeScript compilation
-
-### Details
-```
-error TS2345: Argument of type 'string' is not assignable...
-```
-
-### Resolution
-1. Fix TypeScript error in `src/services/user.ts:45`
-2. Run `npm run build` locally to verify
-3. Try `/deploy` again
-
-### Rollback Available
-Previous version (v1.2.2) is still active.
-Run `/deploy rollback` if needed.
+```bash
+npx wrangler rollback
 ```
 
 ---
 
-## Platform Support
+## Common Mistakes
 
-| Platform | Command | Notes |
-|----------|---------|-------|
-| Vercel | `vercel --prod` | Auto-detected for Next.js |
-| Railway | `railway up` | Needs Railway CLI |
-| Fly.io | `fly deploy` | Needs flyctl |
-| Docker | `docker compose up -d` | For self-hosted |
-
----
-
-## Examples
-
-```
-/deploy
-/deploy check
-/deploy preview
-/deploy production --skip-tests
-/deploy rollback
-```
+| ❌ Wrong | ✅ Correct | Why |
+|----------|-----------|-----|
+| `npx wrangler pages deploy` | `npx wrangler deploy` | Project uses Workers, not Pages |
+| `wrangler deploy` (global) | `npx wrangler deploy` | wrangler not installed globally |
+| Deploy without `pnpm run build` | Build first, then deploy | Workers reads `.svelte-kit/cloudflare` output |

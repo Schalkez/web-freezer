@@ -1,0 +1,49 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "web-freezer",
+	"main": ".svelte-kit/cloudflare/_worker.js",
+	"compatibility_date": "2025-09-27",
+	"compatibility_flags": [
+		"nodejs_compat",
+		"nodejs_als"
+	],
+	"assets": {
+		"binding": "ASSETS",
+		"directory": ".svelte-kit/cloudflare"
+	},
+	"observability": {
+		"enabled": true
+	},
+
+	// KV namespace for job status + rate limiting
+	"kv_namespaces": [
+		{
+			"binding": "KV",
+			"id": "4ff9491c90734dac93663322cc6fc6f3"
+		}
+	],
+
+	// R2 bucket for ZIP archives
+	"r2_buckets": [
+		{
+			"binding": "R2",
+			"bucket_name": "web-freezer-archives"
+		}
+	],
+
+	// Queue producer — push crawl jobs
+	"queues": {
+		"producers": [
+			{
+				"binding": "CRAWL_QUEUE",
+				"queue": "web-freezer-crawl-jobs"
+			}
+		]
+	},
+
+	// Environment variables
+	"vars": {
+		"TURNSTILE_SITE_KEY": "0x4AAAAAACZh6penZBTNI3h1"
+	}
+	// Secret: TURNSTILE_SECRET_KEY (set via `wrangler secret put TURNSTILE_SECRET_KEY`)
+}
